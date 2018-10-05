@@ -1,0 +1,143 @@
+BEGIN {
+  consts["azertyuiop"] = "azertyuiop"
+  bang = "#!/usr/bin/env sh" "\n"
+  prefix = "ed <<EOF" "\n"
+}
+
+{
+  for (r in consts)
+    gsub(r, consts[r])
+}
+
+$1 == "raw" {
+  $1 = ""
+  format_loop(substr($0, 2))
+}
+
+$1 == "shell" {
+  $1 = ""
+  format_loop("!" substr($0, 2))
+}
+
+$1 == "shell!" {
+  $1 = ""
+  format_loop("r !" substr($0, 2))
+}
+
+($1 == "delete" || $1 == "append") && /(at|line|after) [0-9]+$/ {
+  if ($1 == "delete" && $(NF - 1) == "after")
+    pos = $NF + 1
+  else
+    pos = $NF
+  $NF = ""
+  $(NF - 1) = ""
+}
+
+$1 == "set" {
+  if ($2 == "")
+    report(2, 0)
+  else {
+    $1 = ""
+    global[substr($0, 2)] = 1
+  }
+}
+
+$1 == "unset" {
+  if ($2 == "")
+    report(2, 0)
+  else
+    global[$2] = 0
+}
+
+/^do (1 time|[1-9][0-9]* times)$/ {
+  loop = $2
+}
+
+$1 == "goto" {
+  if (match($2, /^[0-9]+$/))
+    format($2)
+  else if (match($2, /^\/.*\/$/))
+    format($2)
+}
+
+$1 == "open" {
+  if ($2 == "" || $3 == "")
+    report("2, 3", 0)
+  else {
+    if ($2 == "empty") {
+      pos = "0"
+      format("!rm -f " $3)
+      $2 = ""
+    }
+    $1 = ""
+    format("!touch " $0)
+    format("e" $0)
+  }
+}
+
+$1 == "delete" {
+  if ($2 == "") {
+    if (pos == "")
+      report(2, 0)
+    else
+      format(pos "d")
+  }
+  else if ($2 == "*") {
+    pos = "0"
+    output = output ",d" "\n"
+  }
+}
+
+$1 == "append" {
+  if ($2 == "")
+    report(2, 0)
+  else {
+    $1 = ""
+    format(pos "a")
+    reset_pos()
+    format_loop(substr($0, 2))
+    format(".")
+  }
+}
+
+$1 == "define" {
+  if ($2 == "" || $3 == "")
+    report("2, 3", 0)
+  else {
+    constname = $2
+    $1 = ""
+    $2 = ""
+    consts[constname] = substr($0, 3)
+  }
+}
+
+END {
+  if (global["debug"] == 1)
+    prefix = prefix "H" "\n"
+  output = bang prefix output  "wq" "\n" "EOF" 
+  if (error == 1)
+    exit 1
+  else
+    print output
+}
+
+function report(field, errcode) {
+  if (errcode == 0) {
+    printf("Error, %s field %s\n", NR, field)
+  }
+  error = 1
+}
+
+function format(comm) {
+  output = output comm "\n"
+}
+
+function format_loop(comm) {
+  for (i = 0; i < loop; i++)
+    output = output comm "\n"
+  loop = 1
+}
+
+function reset_pos() {
+  pos = ""
+}

@@ -1,0 +1,24 @@
+set debug
+define FILENAME hello
+define fun delete line 1
+open empty FILENAME
+do 5 times
+  append hello, world!
+shell echo hello world
+raw 3s/world/me/
+append my name is Tanguy after 2
+goto 1
+do 2 times
+append AAAAAAAAAAH!
+delete line 1
+goto /^my/
+raw p
+fun
+fun
+fun
+raw w
+shell! cat FILENAME | wc
+raw s/\ \ \ */ /g
+raw s/ //
+raw s/ /,/g
+raw ,n
